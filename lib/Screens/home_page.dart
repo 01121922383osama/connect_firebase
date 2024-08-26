@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:connect_firebase/Screens/login_page.dart';
 import 'package:connect_firebase/core/widgets/custom_textfied.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:image_picker/image_picker.dart';
 
 class HomePage extends StatefulWidget {
   final String email;
@@ -21,6 +25,8 @@ class _HomePageState extends State<HomePage> {
   final name = TextEditingController();
   bool isPrgrammer = false;
   bool isCall = false;
+  File? image;
+  String? imageUrl;
   @override
   void initState() {
     super.initState();
@@ -69,6 +75,12 @@ class _HomePageState extends State<HomePage> {
                         userName: posts?[index]['name'],
                         userAge: posts?[index]['age'],
                       ),
+                      leading: posts?[index]['profileimage'] == null
+                          ? null
+                          : CircleAvatar(
+                              backgroundImage:
+                                  NetworkImage(posts?[index]['profileimage']),
+                            ),
                       title: Text(posts?[index]['name']),
                       subtitle: Text(posts?[index]['email']),
                       trailing: CircleAvatar(child: Text(posts?[index]['age'])),
@@ -77,10 +89,78 @@ class _HomePageState extends State<HomePage> {
                 },
               ),
             ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => addPost(),
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            onPressed: () => addPost(),
+            child: const Icon(Icons.add),
+          ),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+            backgroundColor: image == null ? Colors.red : Colors.green,
+            onPressed: () => uploudImage(),
+            child: const Icon(Icons.photo),
+          ),
+        ],
       ),
+    );
+  }
+
+  void uploudImage() async {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Uploud Image'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ElevatedButton(
+                onPressed: () async {
+                  final ImagePicker picker = ImagePicker();
+                  final XFile? imageData = await picker.pickImage(
+                    source: ImageSource.camera,
+                  );
+                  if (imageData != null) {
+                    setState(() {
+                      image = File(imageData.path);
+                    });
+                    final storage = FirebaseStorage.instance.ref();
+                    final data = await storage.child('images').putFile(image!);
+                    imageUrl = await data.storage
+                        .ref()
+                        .child('images')
+                        .getDownloadURL();
+                  }
+                },
+                child: const Text('Camera'),
+              ),
+              const SizedBox(height: 15),
+              ElevatedButton(
+                onPressed: () async {
+                  final ImagePicker picker = ImagePicker();
+                  final XFile? imageData = await picker.pickImage(
+                    source: ImageSource.gallery,
+                  );
+                  if (imageData != null) {
+                    setState(() {
+                      image = File(imageData.path);
+                    });
+                    final storage = FirebaseStorage.instance.ref();
+                    final data = await storage.child('images').putFile(image!);
+                    imageUrl = await data.storage
+                        .ref()
+                        .child('images')
+                        .getDownloadURL();
+                  }
+                },
+                child: const Text('Gallery'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -145,6 +225,7 @@ class _HomePageState extends State<HomePage> {
                     'name': name.text,
                     'age': age.text,
                     'isProgrammer': isPrgrammer,
+                    'profileimage': imageUrl,
                   }).then((va) {
                     setState(() {
                       getPosts();
